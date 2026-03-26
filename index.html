@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>⚽ 널티킥 게임</title>
+
+<style>
+body {
+    margin: 0;
+    font-family: Arial;
+    background: #0b6623;
+    color: white;
+    text-align: center;
+}
+
+#login, #gameArea {
+    margin-top: 30px;
+}
+
+#field {
+    position: relative;
+    width: 400px;
+    height: 300px;
+    margin: 20px auto;
+    background: #1faa59;
+    border: 3px solid white;
+}
+
+#goal {
+    position: absolute;
+    top: 20px;
+    left: 50px;
+    width: 300px;
+    height: 120px;
+    border: 4px solid white;
+}
+
+#keeper {
+    position: absolute;
+    width: 60px;
+    height: 60px;
+    background: blue;
+    top: 60px;
+    left: 170px;
+    transition: 0.3s;
+}
+
+#ball {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background: white;
+    border-radius: 50%;
+    bottom: 20px;
+    left: 190px;
+    transition: 0.4s;
+}
+
+button {
+    padding: 10px;
+    margin: 5px;
+    font-size: 16px;
+}
+</style>
+
+</head>
+<body>
+
+<h1>⚽ 널티킥 게임</h1>
+
+<div id="login">
+    <input id="username" placeholder="이름 입력">
+    <button id="loginBtn">시작</button>
+</div>
+
+<div id="gameArea" style="display:none;">
+    <p id="info"></p>
+
+    <div id="field">
+        <div id="goal"></div>
+        <div id="keeper"></div>
+        <div id="ball"></div>
+    </div>
+
+    <p>⬅️ ↑ ➡️ 키로 슛</p>
+
+    <button id="restartBtn">다시하기</button>
+</div>
+
+<div>
+    <h3>🏆 TOP 5</h3>
+    <ol id="rankList"></ol>
+</div>
+
+<!-- Firebase (선택) -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+<script>
+// ==========================
+// Firebase 설정 (없으면 자동 비활성)
+// ==========================
+const firebaseConfig = {
+ apiKey: "AIzaSyBS_ZQg3qkqjpzK4b08fF7YLnsUYwHW4DY",
+  authDomain: "fenalty-kick.firebaseapp.com",
+  databaseURL: "https://fenalty-kick-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "fenalty-kick",
+  storageBucket: "fenalty-kick.firebasestorage.app",
+  messagingSenderId: "877459270554",
+  appId: "1:877459270554:web:dc85dedc52898ed7aca823"
+};
+
+let db = null;
+
+try {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.database();
+} catch(e) {
+    console.log("Firebase 미설정 상태 (로컬 테스트 가능)");
+}
+
+// ==========================
+
+const loginDiv = document.getElementById("login");
+const gameArea = document.getElementById("gameArea");
+const usernameInput = document.getElementById("username");
+const info = document.getElementById("info");
+const keeper = document.getElementById("keeper");
+const ball = document.getElementById("ball");
+
+let user = "";
+let score = 0;
+let attempts = 0;
+const maxAttempts = 5;
+
+// 로그인
+document.getElementById("loginBtn").addEventListener("click", () => {
+    user = usernameInput.value.trim();
+    if (!user) {
+        alert("이름 입력!");
+        return;
+    }
+
+    loginDiv.style.display = "none";
+    gameArea.style.display = "block";
+    updateInfo();
+});
+
+// 상태 업데이트
+function updateInfo() {
+    info.innerText = `${user} | ${attempts}/${maxAttempts} | ⚽ ${score}`;
+}
+
+// 키 입력
+document.addEventListener("keydown", (e) => {
+    if (attempts >= maxAttempts) return;
+
+    if (e.key === "ArrowLeft") shoot("left");
+    if (e.key === "ArrowUp") shoot("center");
+    if (e.key === "ArrowRight") shoot("right");
+});
+
+function shoot(dir) {
+    attempts++;
+
+    const dirs = ["left","center","right"];
+    const keeperDir = dirs[Math.floor(Math.random()*3)];
+
+    moveKeeper(keeperDir);
+    moveBall(dir);
+
+    setTimeout(() => {
+        if (dir !== keeperDir) {
+            score++;
+            alert("⚽ 골!");
+        } else {
+            alert("🧤 막힘!");
+        }
+
+        reset();
+        updateInfo();
+
+        if (attempts === maxAttempts) endGame();
+
+    }, 500);
+}
+
+function moveKeeper(dir) {
+    if (dir === "left") keeper.style.left = "80px";
+    if (dir === "center") keeper.style.left = "170px";
+    if (dir === "right") keeper.style.left = "260px";
+}
+
+function moveBall(dir) {
+    if (dir === "left") ball.style.left = "80px";
+    if (dir === "center") ball.style.left = "190px";
+    if (dir === "right") ball.style.left = "300px";
+    ball.style.bottom = "200px";
+}
+
+function reset() {
+    ball.style.bottom = "20px";
+    ball.style.left = "190px";
+    keeper.style.left = "170px";
+}
+
+function endGame() {
+    const win = score >= 3;
+    alert(win ? "🏆 승리!" : "❌ 패배");
+
+    saveScore();
+}
+
+// 점수 저장
+function saveScore() {
+    if (!db) return;
+
+    db.ref("scores").push({
+        name: user,
+        score: score,
+        time: Date.now()
+    });
+}
+
+// 다시하기
+document.getElementById("restartBtn").addEventListener("click", () => {
+    score = 0;
+    attempts = 0;
+    updateInfo();
+});
+
+// 랭킹
+if (db) {
+    db.ref("scores")
+    .orderByChild("score")
+    .limitToLast(5)
+    .on("value", (snap) => {
+        const arr = [];
+        snap.forEach(c => arr.push(c.val()));
+        arr.sort((a,b)=>b.score-a.score);
+
+        const list = document.getElementById("rankList");
+        list.innerHTML = "";
+
+        arr.forEach(d => {
+            const li = document.createElement("li");
+            li.innerText = `${d.name} - ${d.score}`;
+            list.appendChild(li);
+        });
+    });
+}
+</script>
+
+</body>
+</html>
